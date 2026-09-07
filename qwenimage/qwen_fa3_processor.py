@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """
 Paired with a good language model. Thanks!
 
@@ -6,11 +8,10 @@ at import time and falls back to PyTorch scaled-dot-product attention (SDPA)
 automatically.  The public class name / call signature are unchanged.
 """
 
+
 import torch
 import torch.nn.functional as F
-from typing import Optional, Tuple
 from diffusers.models.transformers.transformer_qwenimage import apply_rotary_emb_qwen
-
 
 # ---------------------------------------------------------------------------
 # FA3 availability check
@@ -40,7 +41,7 @@ else:
         _k = get_kernel("kernels-community/vllm-flash-attn3")
         _flash_attn_func = _k.flash_attn_func
         _fa3_available = True
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         _fa3_unavailable_reason = (
             "FlashAttention-3 via Hugging Face `kernels` is unavailable. "
             f"Tried `get_kernel('kernels-community/vllm-flash-attn3')` and failed with:\n{e}\n"
@@ -155,9 +156,9 @@ class QwenDoubleStreamAttnProcessorFA3:
         hidden_states: torch.FloatTensor,                          # (B, S_img, D_model)
         encoder_hidden_states: torch.FloatTensor = None,           # (B, S_txt, D_model)
         encoder_hidden_states_mask: torch.FloatTensor = None,      # unused
-        attention_mask: Optional[torch.FloatTensor] = None,        # unsupported on FA3 path
-        image_rotary_emb: Optional[Tuple[torch.Tensor, torch.Tensor]] = None,
-    ) -> Tuple[torch.FloatTensor, torch.FloatTensor]:
+        attention_mask: torch.FloatTensor | None = None,        # unsupported on FA3 path
+        image_rotary_emb: tuple[torch.Tensor, torch.Tensor] | None = None,
+    ) -> tuple[torch.FloatTensor, torch.FloatTensor]:
 
         if encoder_hidden_states is None:
             raise ValueError(
@@ -169,7 +170,7 @@ class QwenDoubleStreamAttnProcessorFA3:
                 "Either drop the mask or let the processor fall back to SDPA."
             )
 
-        B, S_img, _ = hidden_states.shape
+        _B, _S_img, _ = hidden_states.shape
         S_txt = encoder_hidden_states.shape[1]
 
         # ---- QKV projections ----
