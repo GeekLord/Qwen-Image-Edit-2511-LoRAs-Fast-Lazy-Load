@@ -1,14 +1,15 @@
-import os
+import base64
 import gc
+import html as html_lib
+import json
+import os
+import random
+from io import BytesIO
+
 import gradio as gr
 import numpy as np
 import spaces
 import torch
-import random
-import base64
-import json
-import html as html_lib
-from io import BytesIO
 from PIL import Image
 
 MAX_SEED = np.iinfo(np.int32).max
@@ -27,10 +28,10 @@ if torch.cuda.is_available():
 
 print("Using device:", device)
 
-from diffusers import FlowMatchEulerDiscreteScheduler
+
 from qwenimage.pipeline_qwenimage_edit_plus import QwenImageEditPlusPipeline
-from qwenimage.transformer_qwenimage import QwenImageTransformer2DModel
 from qwenimage.qwen_fa3_processor import QwenDoubleStreamAttnProcessorFA3
+from qwenimage.transformer_qwenimage import QwenImageTransformer2DModel
 
 dtype = torch.bfloat16
 
@@ -47,7 +48,7 @@ pipe = QwenImageEditPlusPipeline.from_pretrained(
 try:
     pipe.transformer.set_attn_processor(QwenDoubleStreamAttnProcessorFA3())
     print("Flash Attention 3 Processor set successfully.")
-except Exception as e:
+except Exception as e:  # noqa: BLE001
     print(f"Warning: Could not set FA3 processor: {e}")
 
 ADAPTER_SPECS = {
@@ -183,7 +184,7 @@ def make_thumb_b64(path, max_dim=220):
         buf = BytesIO()
         img.save(buf, format="JPEG", quality=65)
         return f"data:image/jpeg;base64,{base64.b64encode(buf.getvalue()).decode()}"
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         print(f"Thumbnail error for {path}: {e}")
         return ""
 
@@ -197,7 +198,7 @@ def encode_full_image(path):
         ext = path.rsplit(".", 1)[-1].lower()
         mime = {"jpg": "image/jpeg", "jpeg": "image/jpeg", "png": "image/png", "webp": "image/webp"}.get(ext, "image/jpeg")
         return f"data:{mime};base64,{base64.b64encode(data).decode()}"
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         print(f"Encode error for {path}: {e}")
         return ""
 
@@ -256,7 +257,7 @@ def b64_to_pil_list(b64_json_str):
         return []
     try:
         b64_list = json.loads(b64_json_str)
-    except Exception:
+    except Exception:  # noqa: BLE001
         return []
     pil_images = []
     for b64_str in b64_list:
@@ -269,7 +270,7 @@ def b64_to_pil_list(b64_json_str):
                 data = b64_str
             image_data = base64.b64decode(data)
             pil_images.append(Image.open(BytesIO(image_data)).convert("RGB"))
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             print(f"Error decoding image: {e}")
     return pil_images
 
@@ -296,7 +297,7 @@ def infer(
     randomize_seed,
     guidance_scale,
     steps,
-    progress=gr.Progress(track_tqdm=True),
+    progress=gr.Progress(track_tqdm=True),  # noqa: B008
 ):
     gc.collect()
     torch.cuda.empty_cache()
@@ -317,7 +318,7 @@ def infer(
         try:
             pipe.load_lora_weights(spec["repo"], weight_name=spec["weights"], adapter_name=adapter_name)
             LOADED_ADAPTERS.add(adapter_name)
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             raise gr.Error(f"Failed to load adapter {lora_adapter}: {e}")
     else:
         print(f"--- Adapter {lora_adapter} already loaded. ---")
@@ -346,8 +347,6 @@ def infer(
             true_cfg_scale=guidance_scale,
         ).images[0]
         return result_image, seed
-    except Exception as e:
-        raise e
     finally:
         gc.collect()
         torch.cuda.empty_cache()
